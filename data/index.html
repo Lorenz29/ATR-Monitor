@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor ATR</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="card">
+        <h1>Sala de Servidores</h1>
+        <div class="sensor">
+            <span>Temperatura:</span>
+            <span id="temp-val" class="value">-- °C</span>
+        </div>
+        
+        <div class="control-panel">
+            <h2>Control de Iluminación</h2>
+            <button id="btnLed" class="btn">💡 Prender / Apagar LED</button>
+        </div>
+
+        <div class="control-panel">
+            <h2>Control de Ventilación</h2>
+            <span>Extractor:</span>
+            <button id="btn-extractor" class="btn btn-apagado">Apagado</button>
+        </div>
+        
+        <p id="status">Conectando...</p>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
