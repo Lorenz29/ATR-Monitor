@@ -3,31 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor ATR</title>
+    <title>ATR - Monitor Sala de Servidores</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="card">
-        <h1>Sala de Servidores</h1>
-        <div class="sensor">
-            <span>Temperatura:</span>
-            <span id="temp-val" class="value">-- °C</span>
-        </div>
+    <div class="container">
+        <h1>ATR - Control de Sala</h1>
         
-        <div class="control-panel">
-            <h2>Control de Iluminación</h2>
-            <button id="btnLed" class="btn">💡 Prender / Apagar LED</button>
+        <p id="status" style="font-weight: bold; margin-bottom: 20px;">Iniciando...</p>
+
+        <div id="temp-card" class="card">
+            <h3>Temperatura Actual</h3>
+            <div id="temp-value" class="value">--.- °C</div>
         </div>
 
-        <div class="control-panel">
-            <h2>Control de Ventilación</h2>
-            <span>Extractor:</span>
-            <button id="btn-extractor" class="btn btn-apagado">Apagado</button>
+        <div class="card">
+            <h3>Controles</h3>
+            
+            <div class="control-group">
+                <p>Extractor de Aire (Pin 26)</p>
+                <button id="btn-extractor" class="btn">Alternar Extractor</button>
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;">
+                <p>Luz LED de Alerta (Pin 33)</p>
+                <button id="btnLed" class="btn" style="background-color: #2ecc71;">Alternar LED</button>
+            </div>
         </div>
-        
-        <p id="status">Conectando...</p>
     </div>
-    
     <script src="script.js"></script>
 </body>
 </html>
