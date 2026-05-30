@@ -1,5 +1,6 @@
 var gateway = `ws://${window.location.hostname}/ws`;
 var websocket;
+let audioCtx, oscillator; // Variables para el sonido
 
 window.addEventListener('load', onLoad);
 
@@ -9,73 +10,75 @@ function onLoad(event) {
 }
 
 function initWebSocket() {
-    console.log('Intentando abrir conexión WebSocket...');
     websocket = new WebSocket(gateway);
-    websocket.onopen    = onOpen;
-    websocket.onclose   = onClose;
-    websocket.onmessage = onMessage; // Usamos esta única función
+    websocket.onopen = onOpen;
+    websocket.onclose = onClose;
+    websocket.onmessage = onMessage;
 }
 
 function onOpen(event) {
-    console.log('Conexión abierta');
-    const status = document.getElementById('status');
-    if(status){
-        status.innerText = "Conectado en Tiempo Real";
-        status.style.color = "#4caf50";
-    }
+    document.getElementById('status').innerText = "Conectado";
+    document.getElementById('status').style.color = "#4caf50";
 }
 
 function onClose(event) {
-    console.log('Conexión cerrada');
-    const status = document.getElementById('status');
-    if(status){
-        status.innerText = "Desconectado. Reconectando...";
-        status.style.color = "#f44336";
-    }
-    setTimeout(initWebSocket, 2000); 
+    document.getElementById('status').innerText = "Desconectado";
+    setTimeout(initWebSocket, 2000);
 }
 
-// === ESTA ES LA FUNCIÓN CRÍTICA ===
+// En tu script.js, actualizá el umbral
+const UMBRAL_ALERTA = 550; // Debe ser igual al que definiste en el main.cpp
+
 function onMessage(event) {
     let data = JSON.parse(event.data);
-    console.log("Dato recibido:", data);
-
-    // Coincide con doc["type"] = "sensor_update" del .cpp
+    
     if (data.type === "sensor_update") {
-        // IMPORTANTE: Verifica que en tu HTML el ID sea 'temp-value'
-        const tempElement = document.getElementById('temp-value');
-        if (tempElement) {
-            tempElement.innerText = data.value.toFixed(1) + " °C";
-            
-            // Cambio de color dinámico
-            if (data.value > 30) {
-                tempElement.style.color = "red";
+        // ... (resto del código de temperatura)
+
+        // Lógica actualizada de alarma
+        if (data.smoke !== undefined) {
+            // Ahora comparamos contra la misma constante
+            if (data.smoke > UMBRAL_ALERTA) { 
+                activarAlarma();
             } else {
-                tempElement.style.color = "#2c3e50";
+                desactivarAlarma();
             }
         }
     }
 }
 
-function initButtons() {
-    // 1. Botón del Extractor
-    const btnExtractor = document.getElementById('btn-extractor');
-    if (btnExtractor) {
-        btnExtractor.addEventListener('click', () => {
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                websocket.send(JSON.stringify({action: "toggle_extractor"}));
-            }
-        });
+// --- Funciones de Alarma ---
+function activarAlarma() {
+    document.getElementById('alarm-overlay').className = 'alarm-overlay-active';
+    
+    // Iniciar sonido solo si no está iniciado
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        oscillator = audioCtx.createOscillator();
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+        oscillator.connect(audioCtx.destination);
+        oscillator.start();
     }
+}
 
-    // 2. Botón del LED (Ahora por WebSocket también)
-    const btnLed = document.getElementById('btnLed');
-    if (btnLed) {
-        btnLed.addEventListener('click', () => {
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                // Coincide con el action == "toggle_led" que agregamos al .cpp
-                websocket.send(JSON.stringify({action: "toggle_led"}));
-            }
-        });
+function desactivarAlarma() {
+    document.getElementById('alarm-overlay').className = 'alarm-overlay-hidden';
+    
+    // Detener sonido
+    if (audioCtx) {
+        oscillator.stop();
+        oscillator.disconnect();
+        audioCtx = null;
+        oscillator = null;
     }
+}
+
+function initButtons() {
+    document.getElementById('btn-extractor').addEventListener('click', () => {
+        websocket.send(JSON.stringify({action: "toggle_extractor"}));
+    });
+    document.getElementById('btnLed').addEventListener('click', () => {
+        websocket.send(JSON.stringify({action: "toggle_led"}));
+    });
 }

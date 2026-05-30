@@ -19,18 +19,25 @@
 
         <div class="card">
             <h3>Controles</h3>
-            
             <div class="control-group">
                 <p>Extractor de Aire (Pin 26)</p>
                 <button id="btn-extractor" class="btn">Alternar Extractor</button>
             </div>
-
             <div class="control-group" style="margin-top: 15px;">
                 <p>Luz LED de Alerta (Pin 33)</p>
                 <button id="btnLed" class="btn" style="background-color: #2ecc71;">Alternar LED</button>
             </div>
         </div>
     </div>
+
+    <div id="alarm-overlay" class="alarm-overlay-hidden">
+        <div class="alarm-content">
+            <span class="alarm-icon">🚨</span>
+            <h1>¡ALERTA DE INCENDIO!</h1>
+            <p>Nivel de humo crítico detectado</p>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
