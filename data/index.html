@@ -7,12 +7,25 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="alarm-overlay" class="alarm-overlay-hidden">
+        <div class="alarm-icon">⚠️</div>
+        <h1>¡ALARMA DE INCENDIO!</h1>
+        <p>Niveles críticos de humo detectados en la sala de servidores.</p>
+        <button class="btn-stop-alarm" onclick="stopAlarm()">SILENCIAR ALARMA</button>
+    </div>
+
     <div class="container">
         <h1>Monitoreo de Sala de Servidores</h1>
         
         <div class="card">
             <h3>Temperatura Ambiente</h3>
-            <p id="temp-val">--.- °C</p>
+            <p class="value" id="temp-val">--.- °C</p>
+        </div>
+
+        <div class="card">
+            <h3>Sensor de Humo (MQ-2)</h3>
+            <p class="value" id="smoke-val">--</p>
+            <p id="smoke-status">Estado: Normal</p>
         </div>
 
         <div class="card">
@@ -32,6 +45,7 @@
             </div>
         </div>
     </div>
+    
     <script src="script.js"></script>
 </body>
 </html>

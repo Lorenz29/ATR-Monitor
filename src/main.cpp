@@ -7,160 +7,247 @@
 #include "config.h"
 #include "DHT.h"
 
-// Configuración de Pines
-#define DHTPIN 32
-#define DHTTYPE DHT22
-#define FAN_PWM_PIN 25 // Pin de señal PWM al Hub/Ventilador
+// --- Definición de Pines ---
+#define LED_PIN          33   // Led testigo integrado o de placa
+#define ALARMA_LED_PIN   27   // Control del transistor para la baliza de 9 LEDs
+#define EXTRACTOR_PIN    25   // Salida PWM hacia el Hub de ventiladores
+#define DHTPIN           32   // Pin de datos del sensor DHT22
+#define MQ2_PIN          34   // Pin analógico ADC para el sensor de humo MQ-2
 
-// Parámetros PWM para el ESP32 (Periférico LEDC)
-const int pwmChannel = 0;
-const int pwmFreq = 25000; // 25 kHz (frecuencia estándar para fan de PC)
-const int pwmResolution = 8; // 8 bits de resolución (0 a 255)
-
-// Umbrales para el Modo Automático
-const float TEMP_MIN = 25.0; // Ventilador al mínimo/apagado
-const float TEMP_MAX = 35.0; // Ventilador al 100%
-
-// Variables globales de control (Sincronizadas)
-float temperatura_actual = 0.0;
-bool isAutoMode = true;        // Por defecto inicia en Automático
-int fanSpeedPercent = 0;       // Velocidad del fan en % (0-100)
-
+// --- Configuraciones de Periféricos ---
+#define DHTTYPE          DHT22
 DHT dht(DHTPIN, DHTTYPE);
+
+// Configuración PWM para el Extractor (Intel Spec: 25kHz)
+#define PWM_FREQ         25000 
+#define PWM_CHANNEL      0     
+#define PWM_RES          8     // 8 bits de resolución (valores de 0 a 255)
+
+// --- Constantes de Regla de Negocio (Sincronizadas con script.js) ---
+const int UMBRAL_ALERTA = 550;   // Umbral de disparo del MQ-2
+const int PERSISTENCIA_MAX = 5;  // Muestras consecutivas requeridas para confirmar incendio
+
+// --- Variables Globales Compartidas (Protegidas lógicamente) ---
+float temperaturaActual = 0.0;
+int valorMq2Filtrado = 0;
+bool alarmaIncendioActiva = false;
+
+// Variables de control del Extractor
+bool isAutoMode = true;
+int manualSpeedDuty = 0; // Guardará el valor enviado desde la interfaz web (0-255)
+
+// --- Servidor y WebSockets ---
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASS;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-// Función para aplicar la velocidad al periférico PWM
-void setFanSpeed(int percent) {
-    fanSpeedPercent = constrain(percent, 0, 100);
-    // Mapeamos de 0-100% a 0-255 (resolución de 8 bits)
-    int dutyCycle = map(fanSpeedPercent, 0, 100, 0, 255);
-    ledcWrite(pwmChannel, dutyCycle);
-}
-
-// Envío de actualizaciones de estado a la UI
+// --- Función para transmitir telemetría por WebSockets ---
 void broadcastSystemStatus() {
     StaticJsonDocument<200> doc;
-    doc["type"] = "status_update";
-    doc["temperature"] = isnan(temperatura_actual) ? 0.0 : temperatura_actual;
+    doc["type"] = "system_update";
+    doc["temp"] = isnan(temperaturaActual) ? 0.0 : temperaturaActual;
+    doc["mq2"] = valorMq2Filtrado;
+    doc["alarm"] = alarmaIncendioActiva;
     doc["autoMode"] = isAutoMode;
-    doc["fanSpeed"] = fanSpeedPercent;
+    
+    // Convertimos el duty actual a porcentaje (0-100) para el slider de la interfaz
+    int currentDuty = ledcRead(PWM_CHANNEL);
+    doc["fanSpeed"] = map(currentDuty, 0, 255, 0, 100);
 
     String response;
     serializeJson(doc, response);
     ws.textAll(response);
 }
 
-// Manejador de mensajes entrantes desde la Web (WebSockets)
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-    AwsFrameInfo *info = (AwsFrameInfo*)arg;
-    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-        data[len] = 0;
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, data);
-        
-        if (!error) {
+// --- Manejador de Eventos WebSocket (Entrada desde la UI Web) ---
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if (type == WS_EVT_DATA) {
+        AwsFrameInfo *info = (AwsFrameInfo*)arg;
+        if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+            data[len] = 0;
+            String message = (char*)data;
+            
+            StaticJsonDocument<150> doc;
+            DeserializationError error = deserializeJson(doc, message);
+            if (error) return;
+
+            // Procesamiento de comandos enviados desde el Frontend
             if (doc.containsKey("action")) {
-                String action = doc["action"].as<String>();
+                String action = doc["action"];
                 
                 if (action == "setMode") {
-                    isAutoMode = doc["value"].as<bool>();
-                    Serial.printf("Modo cambiado a: %s\n", isAutoMode ? "AUTOMATICO" : "MANUAL");
+                    isAutoMode = doc["value"];
                 } 
                 else if (action == "setSpeed" && !isAutoMode) {
-                    // Solo permite cambiar velocidad manualmente si NO está en modo automático
-                    int speed = doc["value"].as<int>();
-                    setFanSpeed(speed);
-                    Serial.printf("Velocidad manual seteada a: %d%%\n", speed);
+                    int percent = doc["value"];
+                    manualSpeedDuty = map(percent, 0, 100, 0, 255);
+                    ledcWrite(PWM_CHANNEL, manualSpeedDuty);
                 }
-                // Forzamos un broadcast para mantener todas las pestañas web sincronizadas
+                // Sincronizamos a todos los clientes conectados inmediatamente
                 broadcastSystemStatus();
             }
         }
     }
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
-             void *arg, uint8_t *data, size_t len) {
-    switch (type) {
-        case WS_EVT_CONNECT:
-            Serial.printf("Cliente WebSocket conectado desde %s\n", client->remoteIP().toString().c_str());
-            broadcastSystemStatus(); // Envía el estado actual al conectar
-            break;
-        case WS_EVT_DISCONNECT:
-            Serial.printf("Cliente WebSocket desconectado\n");
-            break;
-        case WS_EVT_DATA:
-            handleWebSocketMessage(arg, data, len);
-            break;
-        default:
-            break;
-    }
-}
+// ============================================================================
+// --- TAREAS CONCURRENTES DE FreeRTOS ---
+// ============================================================================
 
-// Tarea FreeRTOS para lectura de sensores y control automático
-void Task_Control(void *pvParameters) {
+// Tarea 1: Monitoreo periódico del Sensor Ambiental DHT22
+void Task_Ambiental(void *pvParameters) {
     for (;;) {
         float t = dht.readTemperature();
         if (!isnan(t)) {
-            temperatura_actual = t;
-            
-            // Lógica de control en Tiempo Real para el Modo Automático
-            if (isAutoMode) {
-                if (temperatura_actual < TEMP_MIN) {
-                    setFanSpeed(0);
-                } else if (temperatura_actual > TEMP_MAX) {
-                    setFanSpeed(100);
-                } else {
-                    // Mapeo lineal proporcional entre los umbrales de temperatura
-                    int calculatedSpeed = map(temperatura_actual, TEMP_MIN, TEMP_MAX, 0, 100);
-                    setFanSpeed(calculatedSpeed);
-                }
-            }
+            temperaturaActual = t;
         }
         
-        // Transmitir datos de manera periódica a la UI
+        // Transmitimos las actualizaciones del sistema
         broadcastSystemStatus();
         
-        // Tasa de muestreo (Polling rate) estable
-        vTaskDelay(pdMS_TO_TICKS(2000)); 
+        // El DHT22 no lee más rápido que cada 2 segundos físicamente
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 
-void Task_WebSockets(void *pvParameters) {
+// Tarea 2: Procesamiento de Señal MQ-2 (Filtro de Promedio Móvil + Persistencia)
+void Task_SeguridadIncendio(void *pvParameters) {
+    const int N = 8; // Tamaño de la ventana del promedio móvil
+    int muestras[N] = {0};
+    int indiceSample = 0;
+    long sumaMuestras = 0;
+    int contadorPersistencia = 0;
+
+    // Inicialización del arreglo de filtrado
+    for(int i=0; i<N; i++) {
+        muestras[i] = analogRead(MQ2_PIN);
+        sumaMuestras += muestras[i];
+    }
+
     for (;;) {
-        ws.cleanupClients();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // 1. Filtro de Promedio Móvil para remover ruido eléctrico de la protoboard
+        sumaMuestras -= muestras[indiceSample];
+        muestras[indiceSample] = analogRead(MQ2_PIN);
+        sumaMuestras += muestras[indiceSample];
+        indiceSample = (indiceSample + 1) % N;
+
+        valorMq2Filtrado = sumaMuestras / N;
+
+        // 2. Algoritmo Determinístico de Persistencia para Evitar Lecturas Espurias
+        if (valorMq2Filtrado > UMBRAL_ALERTA) {
+            if (contadorPersistencia < PERSISTENCIA_MAX) {
+                contadorPersistencia++;
+            }
+        } else {
+            if (contadorPersistencia > 0) {
+                contadorPersistencia--;
+            }
+        }
+
+        // Evaluación de Estado Crítico
+        if (contadorPersistencia >= PERSISTENCIA_MAX) {
+            if (!alarmaIncendioActiva) {
+                alarmaIncendioActiva = true;
+                Serial.println("[ALERTA CRÍTICA] Incendio confirmado por persistencia.");
+            }
+        } else if (contadorPersistencia == 0) {
+            if (alarmaIncendioActiva) {
+                alarmaIncendioActiva = false;
+                Serial.println("[INFO] Estado de peligro normalizado.");
+            }
+        }
+
+        // 3. Control de Actuadores Locales de Alarma
+        if (alarmaIncendioActiva) {
+            digitalWrite(LED_PIN, HIGH);
+            digitalWrite(ALARMA_LED_PIN, HIGH); // Activa transistor de la baliza de 9 LEDs
+        } else {
+            digitalWrite(LED_PIN, LOW);
+            digitalWrite(ALARMA_LED_PIN, LOW);
+        }
+
+        // Tasa de muestreo del MQ-2: 100ms (10 muestras por segundo garantiza respuesta en Tiempo Real)
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
+// Tarea 3: Control Lógico del Extractor de Aire (Lazo de Control / Lógica Manual)
+void Task_ControlExtractor(void *pvParameters) {
+    for (;;) {
+        if (alarmaIncendioActiva) {
+            // Regla de máxima prioridad por seguridad: Extractor a fondo si hay humo
+            ledcWrite(PWM_CHANNEL, 255);
+        } 
+        else if (isAutoMode) {
+            // Lazo de control automático basado en temperatura (Mapeo determinístico)
+            // Ejemplo de regla: de 25°C (Fan apagado) a 35°C (Fan al 100%)
+            if (temperaturaActual < 25.0) {
+                ledcWrite(PWM_CHANNEL, 0);
+            } else if (temperaturaActual > 35.0) {
+                ledcWrite(PWM_CHANNEL, 255);
+            } else {
+                int dutyCalculado = map(temperaturaActual, 25, 35, 0, 255);
+                ledcWrite(PWM_CHANNEL, dutyCalculado);
+            }
+        } 
+        else {
+            // Modo Manual: Acata directamente el último valor retenido desde la UI Web
+            ledcWrite(PWM_CHANNEL, manualSpeedDuty);
+        }
+
+        // Ajuste de lazo de control cada 500ms
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+// ============================================================================
+// --- CONFIGURACIÓN INICIAL (SETUP) ---
+// ============================================================================
 void setup() {
     Serial.begin(115200);
-    
-    // Inicializar LittleFS y DHT
-    if(!LittleFS.begin(true)){ Serial.println("Error al montar LittleFS"); return; }
+
+    // Inicialización de Salidas Digitales
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(ALARMA_LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(ALARMA_LED_PIN, LOW);
+
+    // Configuración del periférico LEDC (Hardware PWM dedicado para Fan)
+    ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RES);
+    ledcAttachPin(EXTRACTOR_PIN, PWM_CHANNEL);
+    ledcWrite(PWM_CHANNEL, 0); // Arranca apagado
+
+    // Inicialización del Sensor DHT22
     dht.begin();
 
-    // Configuración del periférico LEDC para el Fan PWM
-    ledcSetup(pwmChannel, pwmFreq, pwmResolution);
-    ledcAttachPin(FAN_PWM_PIN, pwmChannel);
-    setFanSpeed(0); // Inicia apagado
+    // Inicialización del Sistema de Archivos LittleFS
+    if (!LittleFS.begin(true)) {
+        Serial.println("Error al montar LittleFS");
+        return;
+    }
 
-    // Configuración de Red Access Point
-    WiFi.softAP(WIFI_SSID, WIFI_PASS);
-    Serial.print("IP del servidor: "); Serial.println(WiFi.softAPIP());
+    // Configuración de Red (Access Point)
+    WiFi.softAP(ssid, password);
+    Serial.print("Access Point levantado. IP: ");
+    Serial.println(WiFi.softAPIP());
 
-    // Configurar rutas del Servidor Web y WebSockets
+    // Inicialización de Servidor Web y Rutas Estáticas
     ws.onEvent(onEvent);
     server.addHandler(&ws);
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
-    server.begin();
 
-    // Crear tareas concurrentes en FreeRTOS
-    xTaskCreatePinnedToCore(Task_Control, "ControlYRead", 4096, NULL, 2, NULL, 1);
-    xTaskCreatePinnedToCore(Task_WebSockets, "WS_Clean", 2048, NULL, 1, NULL, 0);
+    server.begin();
+    Serial.println("Servidor web asincrónico corriendo de manera autónoma.");
+
+    // Creación de Tareas FreeRTOS en el Planificador Concurrente
+    xTaskCreatePinnedToCore(Task_Ambiental, "Task_Ambiental", 3072, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(Task_SeguridadIncendio, "Task_Incendio", 3072, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(Task_ControlExtractor, "Task_Extractor", 2048, NULL, 2, NULL, 1);
 }
 
 void loop() {
-    vTaskDelete(NULL); // El bucle principal se elimina para ceder el control total a FreeRTOS
+    // El loop se deja completamente libre eliminando hilos bloqueantes. 
+    // FreeRTOS toma control absoluto del procesador de forma determinística.
+    vTaskDelete(NULL);
 }
