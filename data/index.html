@@ -3,41 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATR - Monitor Sala de Servidores</title>
+    <title>Control de Sala de Servidores</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>ATR - Control de Sala</h1>
+        <h1>Monitoreo de Sala de Servidores</h1>
         
-        <p id="status" style="font-weight: bold; margin-bottom: 20px;">Iniciando...</p>
-
-        <div id="temp-card" class="card">
-            <h3>Temperatura Actual</h3>
-            <div id="temp-value" class="value">--.- °C</div>
+        <div class="card">
+            <h3>Temperatura Ambiente</h3>
+            <p id="temp-val">--.- °C</p>
         </div>
 
         <div class="card">
-            <h3>Controles</h3>
+            <h3>Control de Extractores / Fanes</h3>
+            
             <div class="control-group">
-                <p>Extractor de Aire (Pin 26)</p>
-                <button id="btn-extractor" class="btn">Alternar Extractor</button>
+                <label>Modo de Funcionamiento:</label>
+                <select id="mode-select" onchange="changeMode()">
+                    <option value="auto">Automático (Por Temp)</option>
+                    <option value="manual">Manual (UI Slider)</option>
+                </select>
             </div>
-            <div class="control-group" style="margin-top: 15px;">
-                <p>Luz LED de Alerta (Pin 33)</p>
-                <button id="btnLed" class="btn" style="background-color: #2ecc71;">Alternar LED</button>
+
+            <div class="control-group">
+                <label>Velocidad del Ventilador: <span id="fan-speed-txt">0</span>%</label>
+                <input type="range" id="fan-slider" min="0" max="100" value="0" oninput="updateSliderTxt(this.value)" onchange="sendFanSpeed(this.value)">
             </div>
         </div>
     </div>
-
-    <div id="alarm-overlay" class="alarm-overlay-hidden">
-        <div class="alarm-content">
-            <span class="alarm-icon">🚨</span>
-            <h1>¡ALERTA DE INCENDIO!</h1>
-            <p>Nivel de humo crítico detectado</p>
-        </div>
-    </div>
-
     <script src="script.js"></script>
 </body>
 </html>
