@@ -26,6 +26,26 @@
             <h3>Sensor de Humo (MQ-2)</h3>
             <p class="value" id="smoke-val">--</p>
             <p id="smoke-status">Estado: Normal</p>
+            
+            <div class="control-group" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                <p id="cal-status" style="font-size: 0.95rem; font-weight: bold;">Inicializando sensor...</p>
+                <label style="font-size: 0.9rem;">Umbral de Alerta Actual: <span id="umbral-val">--</span></label>
+                
+                <div class="umbral-config">
+                    <input type="number" id="umbral-input" min="0" max="4095" placeholder="Ej: 850">
+                    <button class="btn btn-on" onclick="sendUmbral()">Fijar Umbral</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Sistemas de Potencia e Iluminación</h3>
+            <div class="relay-grid">
+                <button id="btn-relay1" class="btn btn-off" onclick="toggleRelay1()">Fuente ATX: OFF</button>
+                <button id="btn-relay2" class="btn btn-off" onclick="toggleRelay2()">Línea 12v Aux 1: OFF</button>
+                <button id="btn-relay3" class="btn btn-off" onclick="toggleRelay3()">Línea 12v Aux 2: OFF</button>
+                <button id="btn-led" class="btn btn-off" onclick="toggleLed()">LED Placa: OFF</button>
+            </div>
         </div>
 
         <div class="card">

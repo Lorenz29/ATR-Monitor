@@ -6,6 +6,7 @@
     --accent-color: #3498db;
     --status-ok: #4caf50;
     --danger-color: #e74c3c;
+    --btn-off-color: #7f8c8d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,14 +46,38 @@ body {
 }
 
 .btn { 
-    background-color: var(--accent-color); 
     color: white; 
     border: none; 
-    padding: 15px 30px; 
-    border-radius: 10px; 
+    padding: 12px 10px; 
+    border-radius: 8px; 
     cursor: pointer; 
-    font-size: 1rem; 
+    font-size: 0.95rem; 
+    font-weight: bold;
     width: 100%; 
+    transition: background-color 0.2s ease;
+}
+
+.relay-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.btn-on {
+    background-color: var(--status-ok);
+}
+
+.btn-on:hover {
+    background-color: #439246;
+}
+
+.btn-off {
+    background-color: var(--btn-off-color);
+}
+
+.btn-off:hover {
+    background-color: #6c7a7a;
 }
 
 .control-group {
@@ -69,7 +94,6 @@ input[type=range] {
     width: 100%;
 }
 
-/* --- ESTILOS DE LA PANTALLA DE ALARMA --- */
 .alarm-overlay-hidden { display: none !important; }
 
 .alarm-overlay-active {
@@ -78,7 +102,7 @@ input[type=range] {
     top: 0; left: 0;
     width: 100%; height: 100%;
     background-color: rgba(255, 0, 0, 0.9);
-    z-index: 9999; /* Para que quede siempre por encima de todo */
+    z-index: 9999; 
     justify-content: center;
     align-items: center;
     flex-direction: column;
@@ -112,4 +136,27 @@ input[type=range] {
     cursor: pointer;
     margin-top: 30px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+}
+
+/* Alineación para la entrada del umbral */
+.umbral-config {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 5px;
+}
+
+.umbral-config input[type="number"] {
+    width: 80px;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    text-align: center;
+    font-weight: bold;
+}
+
+.umbral-config button {
+    width: auto;
+    padding: 8px 15px;
 }
