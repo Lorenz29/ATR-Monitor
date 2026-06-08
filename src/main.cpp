@@ -15,7 +15,7 @@
 #define MQ2_PIN          34   // Pin analógico ADC para el sensor de humo MQ-2
 
 // Nuevos pines de control de Potencia (Módulo de Relés HL-58s)
-#define RELAY1_ATX_PIN   12   // Control de encendido/apagado de Fuente ATX
+#define RELAY1_ATX_PIN   21   // Control de encendido/apagado de Fuente ATX
 #define RELAY2_LINE1_PIN 13   // Canal genérico para Línea Genérica 1 (Futuro 12V)
 #define RELAY3_LINE2_PIN 14   // Canal genérico para Línea Genérica 2 (Futuro 12V)
 
@@ -130,16 +130,16 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
                 }
                 else if (action == "toggleRelay1") {
                     estadoRelay1Atx = !estadoRelay1Atx;
-                    digitalWrite(RELAY1_ATX_PIN, estadoRelay1Atx ? HIGH : LOW);
+                    digitalWrite(RELAY1_ATX_PIN, estadoRelay1Atx ? LOW : HIGH);
                     Serial.printf("[ATX] Estado de la fuente conmutado a: %s\n", estadoRelay1Atx ? "ON" : "OFF");
                 }
                 else if (action == "toggleRelay2") {
                     estadoRelay2Line1 = !estadoRelay2Line1;
-                    digitalWrite(RELAY2_LINE1_PIN, estadoRelay2Line1 ? HIGH : LOW);
+                    digitalWrite(RELAY2_LINE1_PIN, estadoRelay2Line1 ? LOW : HIGH);
                 }
                 else if (action == "toggleRelay3") {
                     estadoRelay3Line2 = !estadoRelay3Line2;
-                    digitalWrite(RELAY3_LINE2_PIN, estadoRelay3Line2 ? HIGH : LOW);
+                    digitalWrite(RELAY3_LINE2_PIN, estadoRelay3Line2 ? LOW : HIGH);
                 }
                 else if (action == "stopAlarm") {
                     enSnooze = true;
@@ -278,17 +278,21 @@ void Task_ControlExtractor(void *pvParameters) {
 void setup() {
     Serial.begin(115200);
 
-    pinMode(LED_PIN, OUTPUT);
-    pinMode(ALARMA_LED_PIN, OUTPUT);
+    // 1. Primero fijamos el estado HIGH (Relés apagados)
+    digitalWrite(RELAY1_ATX_PIN, HIGH);
+    digitalWrite(RELAY2_LINE1_PIN, HIGH);
+    digitalWrite(RELAY3_LINE2_PIN, HIGH);
+    
+    // Los LEDs sí se apagan con LOW, los dejamos así
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(ALARMA_LED_PIN, LOW);
+
+    // 2. Ahora sí los declaramos como salidas (ya nacen apagados)
     pinMode(RELAY1_ATX_PIN, OUTPUT);
     pinMode(RELAY2_LINE1_PIN, OUTPUT);
     pinMode(RELAY3_LINE2_PIN, OUTPUT);
-
-    digitalWrite(LED_PIN, LOW);
-    digitalWrite(ALARMA_LED_PIN, LOW);
-    digitalWrite(RELAY1_ATX_PIN, LOW);
-    digitalWrite(RELAY2_LINE1_PIN, LOW);
-    digitalWrite(RELAY3_LINE2_PIN, LOW);
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(ALARMA_LED_PIN, OUTPUT);
 
     ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RES);
     ledcAttachPin(EXTRACTOR_PIN, PWM_CHANNEL);
