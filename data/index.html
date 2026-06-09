@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Sala de Servidores</title>
+    <title>ATR Monitor</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,55 +14,98 @@
         <button class="btn-stop-alarm" onclick="stopAlarm()">SILENCIAR ALARMA</button>
     </div>
 
-    <div class="container">
-        <h1>Monitoreo de Sala de Servidores</h1>
+    <div class="header">
+        <h1>ATR Monitor</h1>
+        <p id="subtitle">Sistema de Monitoreo de Sala de Servidores</p>
         
-        <div class="card">
-            <h3>Temperatura Ambiente</h3>
-            <p class="value" id="temp-val">--.- °C</p>
-        </div>
+        <button id="power-btn" class="power-off" onclick="toggleSystem()">
+            <svg viewBox="0 0 24 24" class="power-icon">
+                <path d="M18.36 5.64a9 9 0 1 1-12.72 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+            </svg>
+        </button>
+    </div>
 
-        <div class="card">
-            <h3>Sensor de Humo (MQ-2)</h3>
-            <p class="value" id="smoke-val">--</p>
-            <p id="smoke-status">Estado: Normal</p>
+    <div id="dashboard" class="hidden">
+        
+        <div class="sidebar">
+            <button class="nav-btn active" onclick="showTab('tab-ventilacion')">🌀 Ventilación</button>
+            <button class="nav-btn" onclick="showTab('tab-energia')">⚡ Energía</button>
+            <button class="nav-btn" onclick="showTab('tab-incendio')">🔥 Incendio</button>
+            <button class="nav-btn" onclick="showTab('tab-iluminacion')">💡 Iluminación</button>
+        </div>
+        
+        <div class="content">
             
-            <div class="control-group" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
-                <p id="cal-status" style="font-size: 0.95rem; font-weight: bold;">Inicializando sensor...</p>
-                <label style="font-size: 0.9rem;">Umbral de Alerta Actual: <span id="umbral-val">--</span></label>
-                
-                <div class="umbral-config">
-                    <input type="number" id="umbral-input" min="0" max="4095" placeholder="Ej: 850">
-                    <button class="btn btn-on" onclick="sendUmbral()">Fijar Umbral</button>
+            <div id="tab-ventilacion" class="tab-content active">
+                <div class="card">
+                    <h3>Medición de Temperatura</h3>
+                    <p class="value" id="temp-val">--.- °C</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+                    
+                    <h3>Control del Extractor</h3>
+                    <div class="control-group">
+                        <label>Modo de Funcionamiento:</label>
+                        <select id="mode-select" onchange="changeMode()">
+                            <option value="auto">Automático (Por Temp)</option>
+                            <option value="manual">Manual (UI Slider)</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Velocidad del Ventilador: <span id="fan-speed-txt">0</span>%</label>
+                        <input type="range" id="fan-slider" min="0" max="100" value="0" oninput="updateSliderTxt(this.value)" onchange="sendFanSpeed(this.value)">
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="card">
-            <h3>Sistemas de Potencia e Iluminación</h3>
-            <div class="relay-grid">
-                <button id="btn-relay1" class="btn btn-off" onclick="toggleRelay1()">Fuente ATX: OFF</button>
-                <button id="btn-relay2" class="btn btn-off" onclick="toggleRelay2()">Línea 12v Aux 1: OFF</button>
-                <button id="btn-relay3" class="btn btn-off" onclick="toggleRelay3()">Línea 12v Aux 2: OFF</button>
-                <button id="btn-led" class="btn btn-off" onclick="toggleLed()">LED Placa: OFF</button>
-            </div>
-        </div>
+            <div id="tab-energia" class="tab-content">
+                <div class="card">
+                    <h3>Líneas de Alimentación</h3>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+                        <div>
+                            <p style="margin: 0; color: #7f8c8d;">Línea A</p>
+                            <h4 style="margin: 5px 0;">12.1 V | 2.3 A</h4>
+                        </div>
+                        <div>
+                            <p style="margin: 0; color: #7f8c8d;">Línea B</p>
+                            <h4 style="margin: 5px 0;">11.9 V | 1.8 A</h4>
+                        </div>
+                    </div>
 
-        <div class="card">
-            <h3>Control de Extractores / Fanes</h3>
-            
-            <div class="control-group">
-                <label>Modo de Funcionamiento:</label>
-                <select id="mode-select" onchange="changeMode()">
-                    <option value="auto">Automático (Por Temp)</option>
-                    <option value="manual">Manual (UI Slider)</option>
-                </select>
+                    <h3>Actuadores (Relés)</h3>
+                    <div class="relay-grid">
+                        <button id="btn-relay2" class="btn btn-off" onclick="toggleRelay2()">Línea 12v Aux 1: OFF</button>
+                        <button id="btn-relay3" class="btn btn-off" onclick="toggleRelay3()">Línea 12v Aux 2: OFF</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="control-group">
-                <label>Velocidad del Ventilador: <span id="fan-speed-txt">0</span>%</label>
-                <input type="range" id="fan-slider" min="0" max="100" value="0" oninput="updateSliderTxt(this.value)" onchange="sendFanSpeed(this.value)">
+            <div id="tab-incendio" class="tab-content">
+                <div class="card">
+                    <h3>Sensor de Humo (MQ-2)</h3>
+                    <p class="value" id="smoke-val">--</p>
+                    <p id="smoke-status">Estado: Normal</p>
+                    
+                    <div class="control-group" style="border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px;">
+                        <p id="cal-status" style="font-size: 0.95rem; font-weight: bold;">Inicializando sensor...</p>
+                        <label style="font-size: 0.9rem;">Umbral de Alerta Actual: <span id="umbral-val">--</span></label>
+                        
+                        <div class="umbral-config">
+                            <input type="number" id="umbral-input" min="0" max="4095" placeholder="Ej: 850">
+                            <button class="btn btn-on" onclick="sendUmbral()">Fijar Umbral</button>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <div id="tab-iluminacion" class="tab-content">
+                <div class="card">
+                    <h3>Iluminación de Sala</h3>
+                    <button id="btn-led" class="btn btn-off" onclick="toggleLed()" style="padding: 20px; font-size: 1.2rem;">LED Placa: OFF</button>
+                </div>
+            </div>
+
         </div>
     </div>
     
